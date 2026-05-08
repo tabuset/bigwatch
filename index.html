@@ -24,27 +24,27 @@
             font-weight: 900; /* 極太にして視認性を最大限に高める */
             /* 数字の幅を固定して、秒が変わるたびに文字がブレるのを防ぐ */
             font-variant-numeric: tabular-nums; 
-            text-shadow: 0 0 40px rgba(255, 255, 255, 0.2);
         }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col items-center justify-center select-none relative overflow-hidden">
+<body class="h-screen w-screen flex flex-col select-none relative overflow-hidden transition-colors duration-500" style="background-color: #0f172a;">
 
-    <!-- メインの時計表示エリア -->
-    <main class="text-center w-full h-full flex flex-col items-center justify-center" id="clock-container">
-        <!-- 日付 -->
-        <div id="date" class="text-[min(6vw,6vh)] md:text-[min(4vw,5vh)] text-slate-400 font-bold tracking-widest transition-all z-10 mb-4 md:mb-8">
-            ----/--/-- (-)
-        </div>
-        <!-- 時間 -->
-        <!-- scale-yを使って縦に引き伸ばしつつ、min()を使って画面縦横どちらにも収まるように制限 -->
-        <div id="time" class="font-clock text-[min(20vw,25vh)] md:text-[min(19vw,19vh)] scale-y-[3] md:scale-y-[4] leading-none tracking-tighter transition-all whitespace-nowrap origin-center">
-            --:--:--
-        </div>
+    <!-- 日付（上部に固定） -->
+    <div id="date" class="absolute top-4 left-0 w-full text-center text-4xl md:text-5xl lg:text-6xl text-slate-400 font-bold tracking-widest z-10 drop-shadow-md">
+        ----/--/-- (-)
+    </div>
+
+    <!-- メインの時計表示エリア (SVGで上下左右めいっぱい) -->
+    <!-- 上下パディングをさらに削って、日付やボタンに触れるギリギリまで広げる -->
+    <main class="absolute inset-0 pt-16 pb-20 px-2 w-full h-full flex flex-col items-center justify-center z-0" id="clock-container">
+        <!-- preserveAspectRatio="none" によって、枠に合わせて縦横比を無視して引き伸ばされる -->
+        <svg id="svg-container" class="w-full h-full" preserveAspectRatio="none" style="filter: drop-shadow(0 0 40px rgba(255, 255, 255, 0.2)); color: #f8fafc;">
+            <text id="time-svg" x="0" y="0" class="font-clock fill-current">--:--:--</text>
+        </svg>
     </main>
 
     <!-- コントロールボタンエリア（右下） -->
-    <div class="absolute bottom-6 right-6 flex gap-4">
+    <div class="absolute bottom-6 right-6 flex gap-4 z-10">
         <!-- 12/24時間切り替えボタン -->
         <button id="format-btn" onclick="toggleFormat()" class="w-12 h-12 flex items-center justify-center bg-slate-800/50 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all backdrop-blur-sm font-bold text-sm tracking-tighter" title="12/24時間表記切り替え">
             12/24
@@ -69,6 +69,7 @@
         // 状態管理
         let is24HourFormat = true;
         let currentThemeIndex = 0;
+        let isViewBoxSet = false; // viewBoxを固定したかどうかのフラグ
         
         // テーマの配列 (背景色, テキスト色, 日付色)
         const themes = [
@@ -96,7 +97,25 @@
             }
             
             const displayHours = String(hours).padStart(2, '0');
-            document.getElementById('time').textContent = `${displayHours}:${minutes}:${seconds}`;
+            const timeString = `${displayHours}:${minutes}:${seconds}`;
+            const svgText = document.getElementById('time-svg');
+            const svgEl = document.getElementById('svg-container');
+
+            svgText.textContent = timeString;
+
+            // 初回、文字のバウンディングボックスを取得してSVGの描画領域をピッタリ合わせる
+            if (!isViewBoxSet) {
+                // 最も幅が広そうな文字でサイズを測る
+                svgText.textContent = "00:00:00";
+                const bbox = svgText.getBBox();
+                if (bbox.width > 0) {
+                    // フォント自体の見えない上下余白を強引に削り込み、文字をさらに上下に引き伸ばす
+                    const tightenY = bbox.height * 0.1; // 10%削る
+                    svgEl.setAttribute('viewBox', `${bbox.x} ${bbox.y + tightenY} ${bbox.width} ${bbox.height - tightenY * 2}`);
+                    isViewBoxSet = true;
+                }
+                svgText.textContent = timeString; // 元に戻す
+            }
 
             // 日付のフォーマット (例: 2026/05/08 (金))
             const year = now.getFullYear();
@@ -126,14 +145,15 @@
             const theme = themes[currentThemeIndex];
             
             document.body.style.backgroundColor = theme.bg;
-            document.getElementById('time').style.color = theme.text;
+            document.getElementById('svg-container').style.color = theme.text;
             document.getElementById('date').style.color = theme.date;
             
-            // ライトモードの時はテキストシャドウを消すなどの微調整
+            // ライトモードの時はドロップシャドウを消すなどの微調整
+            const svgContainer = document.getElementById('svg-container');
             if(theme.bg === '#f8fafc') {
-                document.getElementById('time').style.textShadow = 'none';
+                svgContainer.style.filter = 'none';
             } else {
-                document.getElementById('time').style.textShadow = `0 0 40px ${theme.text}40`; // 40は透明度25%の16進数
+                svgContainer.style.filter = `drop-shadow(0 0 40px ${theme.text}40)`; // 40は透明度25%の16進数
             }
         }
 
