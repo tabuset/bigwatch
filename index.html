@@ -26,48 +26,39 @@
             font-variant-numeric: tabular-nums; 
             text-shadow: 0 0 40px rgba(255, 255, 255, 0.2);
         }
-
-        /* ツールチップのフェードイン */
-        .tooltip {
-            visibility: hidden;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .group:hover .tooltip {
-            visibility: visible;
-            opacity: 1;
-        }
     </style>
+</head>
 <body class="h-screen w-screen flex flex-col items-center justify-center select-none relative overflow-hidden">
 
     <!-- メインの時計表示エリア -->
-    <main class="text-center group cursor-pointer w-full h-full flex flex-col items-center justify-center" id="clock-container" onclick="toggleFormat()">
+    <main class="text-center w-full h-full flex flex-col items-center justify-center" id="clock-container">
         <!-- 日付 -->
-        <div id="date" class="text-[6vw] md:text-[4vw] text-slate-400 font-bold tracking-widest transition-all z-10 mb-8 md:mb-16">
+        <div id="date" class="text-[min(6vw,6vh)] md:text-[min(4vw,5vh)] text-slate-400 font-bold tracking-widest transition-all z-10 mb-4 md:mb-8">
             ----/--/-- (-)
         </div>
         <!-- 時間 -->
-        <!-- scale-yを使って縦に3〜4倍引き伸ばし、画面ギリギリまで詰める -->
-        <div id="time" class="font-clock text-[23vw] scale-y-[3] md:scale-y-[4] leading-none tracking-tighter transition-all whitespace-nowrap origin-center">
+        <!-- scale-yを使って縦に引き伸ばしつつ、min()を使って画面縦横どちらにも収まるように制限 -->
+        <div id="time" class="font-clock text-[min(20vw,25vh)] md:text-[min(19vw,19vh)] scale-y-[3] md:scale-y-[4] leading-none tracking-tighter transition-all whitespace-nowrap origin-center">
             --:--:--
-        </div>
-        <!-- 12/24時間表記切り替えのヒント -->
-        <div class="tooltip absolute left-1/2 -translate-x-1/2 mt-4 text-sm text-slate-500 bg-slate-800 px-3 py-1 rounded-full shadow-lg">
-            クリックで12/24時間表記を切り替え
         </div>
     </main>
 
     <!-- コントロールボタンエリア（右下） -->
     <div class="absolute bottom-6 right-6 flex gap-4">
+        <!-- 12/24時間切り替えボタン -->
+        <button id="format-btn" onclick="toggleFormat()" class="w-12 h-12 flex items-center justify-center bg-slate-800/50 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all backdrop-blur-sm font-bold text-sm tracking-tighter" title="12/24時間表記切り替え">
+            12/24
+        </button>
+
         <!-- カラーテーマ変更ボタン -->
-        <button id="theme-btn" onclick="changeTheme()" class="p-3 bg-slate-800/50 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all backdrop-blur-sm" title="テーマ変更">
+        <button id="theme-btn" onclick="changeTheme()" class="w-12 h-12 flex items-center justify-center bg-slate-800/50 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all backdrop-blur-sm" title="テーマ変更">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
             </svg>
         </button>
 
         <!-- フルスクリーン切り替えボタン -->
-        <button id="fullscreen-btn" onclick="toggleFullScreen()" class="p-3 bg-slate-800/50 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all backdrop-blur-sm" title="フルスクリーン">
+        <button id="fullscreen-btn" onclick="toggleFullScreen()" class="w-12 h-12 flex items-center justify-center bg-slate-800/50 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all backdrop-blur-sm" title="フルスクリーン">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="fs-icon">
                 <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
             </svg>
