@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>フルスクリーン時計</title>
+    <!-- Tailwind CSSの読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fontsの読み込み (時間用に視認性の高いRoboto、日付用に日本語フォント) -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        /* カスタムフォントとアニメーションの定義 */
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #0f172a; /* Tailwindのslate-900相当 */
+            color: #f8fafc; /* Tailwindのslate-50相当 */
+            overflow: hidden; /* スクロールバーを隠す */
+            transition: background-color 0.5s ease;
+        }
+        
+        .font-clock {
+            font-family: 'Roboto', sans-serif;
+            font-weight: 900; /* 極太にして視認性を最大限に高める */
+            /* 数字の幅を固定して、秒が変わるたびに文字がブレるのを防ぐ */
+            font-variant-numeric: tabular-nums; 
+            text-shadow: 0 0 40px rgba(255, 255, 255, 0.2);
+        }
+
+        /* ツールチップのフェードイン */
+        .tooltip {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .group:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+<body class="h-screen w-screen flex flex-col items-center justify-center select-none relative overflow-hidden">
+
+    <!-- メインの時計表示エリア -->
+    <main class="text-center group cursor-pointer w-full h-full flex flex-col items-center justify-center" id="clock-container" onclick="toggleFormat()">
+        <!-- 日付 -->
+        <div id="date" class="text-[6vw] md:text-[4vw] text-slate-400 font-bold tracking-widest transition-all z-10 mb-8 md:mb-16">
+            ----/--/-- (-)
+        </div>
+        <!-- 時間 -->
+        <!-- scale-yを使って縦に3〜4倍引き伸ばし、画面ギリギリまで詰める -->
+        <div id="time" class="font-clock text-[23vw] scale-y-[3] md:scale-y-[4] leading-none tracking-tighter transition-all whitespace-nowrap origin-center">
+            --:--:--
+        </div>
+        <!-- 12/24時間表記切り替えのヒント -->
+        <div class="tooltip absolute left-1/2 -translate-x-1/2 mt-4 text-sm text-slate-500 bg-slate-800 px-3 py-1 rounded-full shadow-lg">
+            クリックで12/24時間表記を切り替え
+        </div>
+    </main>
+
+    <!-- コントロールボタンエリア（右下） -->
+    <div class="absolute bottom-6 right-6 flex gap-4">
+        <!-- カラーテーマ変更ボタン -->
+        <button id="theme-btn" onclick="changeTheme()" class="p-3 bg-slate-800/50 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all backdrop-blur-sm" title="テーマ変更">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+            </svg>
+        </button>
+
+        <!-- フルスクリーン切り替えボタン -->
+        <button id="fullscreen-btn" onclick="toggleFullScreen()" class="p-3 bg-slate-800/50 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all backdrop-blur-sm" title="フルスクリーン">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="fs-icon">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+            </svg>
+        </button>
+    </div>
+
+    <script>
+        // 状態管理
+        let is24HourFormat = true;
+        let currentThemeIndex = 0;
+        
+        // テーマの配列 (背景色, テキスト色, 日付色)
+        const themes = [
+            { bg: '#0f172a', text: '#f8fafc', date: '#94a3b8' }, // Slate (デフォルト)
+            { bg: '#000000', text: '#22c55e', date: '#166534' }, // Hacker Green
+            { bg: '#170f2a', text: '#e879f9', date: '#c026d3' }, // Neon Purple
+            { bg: '#2a0f0f', text: '#f87171', date: '#b91c1c' }, // Crimson
+            { bg: '#f8fafc', text: '#0f172a', date: '#475569' }  // Light Mode
+        ];
+
+        // 時間と日付を更新する関数
+        function updateClock() {
+            const now = new Date();
+            
+            // 時間のフォーマット
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            if (!is24HourFormat) {
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12;
+                hours = hours ? hours : 12; // 0時は12時とする
+                // AM/PMを表示したい場合はここに追加できますが、シンプルさ重視で今回は数字のみ
+            }
+            
+            const displayHours = String(hours).padStart(2, '0');
+            document.getElementById('time').textContent = `${displayHours}:${minutes}:${seconds}`;
+
+            // 日付のフォーマット (例: 2026/05/08 (金))
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const date = String(now.getDate()).padStart(2, '0');
+            const days = ['日', '月', '火', '水', '木', '金', '土'];
+            const dayOfWeek = days[now.getDay()];
+            
+            document.getElementById('date').textContent = `${year}/${month}/${date} (${dayOfWeek})`;
+
+            // 次の秒が切り替わるジャストのタイミングで再帰呼び出し（高精度）
+            const msToNextSecond = 1000 - now.getMilliseconds();
+            setTimeout(updateClock, msToNextSecond);
+        }
+
+        // 12/24時間表記の切り替え
+        function toggleFormat() {
+            is24HourFormat = !is24HourFormat;
+            // 即座に更新を反映させるために少しだけ待つ(setTimeoutがクリアされないように配慮)
+            const now = new Date();
+            updateClock();
+        }
+
+        // テーマの変更
+        function changeTheme() {
+            currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+            const theme = themes[currentThemeIndex];
+            
+            document.body.style.backgroundColor = theme.bg;
+            document.getElementById('time').style.color = theme.text;
+            document.getElementById('date').style.color = theme.date;
+            
+            // ライトモードの時はテキストシャドウを消すなどの微調整
+            if(theme.bg === '#f8fafc') {
+                document.getElementById('time').style.textShadow = 'none';
+            } else {
+                document.getElementById('time').style.textShadow = `0 0 40px ${theme.text}40`; // 40は透明度25%の16進数
+            }
+        }
+
+        // フルスクリーンの切り替え
+        function toggleFullScreen() {
+            const doc = window.document;
+            const docEl = doc.documentElement;
+
+            const requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+            const cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+
+            const icon = document.getElementById('fs-icon');
+
+            if (!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
+                requestFullScreen.call(docEl);
+                // 縮小アイコンに変更
+                icon.innerHTML = '<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>';
+            } else {
+                cancelFullScreen.call(doc);
+                // 拡大アイコンに戻す
+                icon.innerHTML = '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>';
+            }
+        }
+
+        // 初回実行
+        updateClock();
+    </script>
+</body>
+</html>
