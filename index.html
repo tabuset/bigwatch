@@ -1,50 +1,51 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>フルスクリーン時計</title>
+
     <!-- Tailwind CSSの読み込み -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fontsの読み込み (時間用に視認性の高いRoboto、日付用に日本語フォント) -->
+
+    <!-- Google Fontsの読み込み -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
     
     <style>
-        /* カスタムフォントとアニメーションの定義 */
         body {
             font-family: 'Noto Sans JP', sans-serif;
-            background-color: #0f172a; /* Tailwindのslate-900相当 */
-            color: #ffffff; /* 文字は白色 */
-            overflow: hidden; /* スクロールバーを隠す */
+            background-color: #000000;
+            color: #ffffff;
+            overflow: hidden;
             transition: background-color 0.5s ease;
         }
         
         .font-clock {
             font-family: 'Roboto', sans-serif;
-            font-weight: 900; /* 極太にして視認性を最大限に高める */
-            /* 数字の幅を固定して、秒が変わるたびに文字がブレるのを防ぐ */
-            font-variant-numeric: tabular-nums; 
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
         }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col select-none relative overflow-hidden transition-colors duration-500" style="background-color: #0f172a;">
+
+<body class="h-screen w-screen flex flex-col select-none relative overflow-hidden transition-colors duration-500" style="background-color: #000000;">
 
     <!-- 日付（上部に固定） -->
-    <div id="date" class="absolute top-4 left-0 w-full text-center text-4xl md:text-5xl lg:text-6xl text-slate-400 font-bold tracking-widest z-10 drop-shadow-md">
+    <div id="date" class="absolute top-4 left-0 w-full text-center text-4xl md:text-5xl lg:text-6xl text-white font-bold tracking-widest z-10" style="color: #ffffff;">
         ----/--/-- (-)
     </div>
 
-    <!-- メインの時計表示エリア (SVGで上下左右めいっぱい) -->
-    <!-- 上下パディングをさらに削って、日付やボタンに触れるギリギリまで広げる -->
+    <!-- メインの時計表示エリア -->
     <main class="absolute inset-0 pt-16 pb-20 px-2 w-full h-full flex flex-col items-center justify-center z-0" id="clock-container">
-        <!-- preserveAspectRatio="none" によって、枠に合わせて縦横比を無視して引き伸ばされる -->
-        <svg id="svg-container" class="w-full h-full" preserveAspectRatio="none" style="filter: drop-shadow(0 0 40px #86efac40); color: #86efac;">
+        <svg id="svg-container" class="w-full h-full" preserveAspectRatio="none" style="filter: none; color: #ffffff;">
             <text id="time-svg" x="0" y="0" class="font-clock fill-current">--:--:--</text>
         </svg>
     </main>
 
     <!-- コントロールボタンエリア（右下） -->
     <div class="absolute bottom-6 right-6 flex gap-4 z-10">
+
         <!-- 12/24時間切り替えボタン -->
         <button id="format-btn" onclick="toggleFormat()" class="w-12 h-12 flex items-center justify-center bg-slate-800/50 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all backdrop-blur-sm font-bold text-sm tracking-tighter" title="12/24時間表記切り替え">
             12/24
@@ -69,19 +70,24 @@
         // 状態管理
         let is24HourFormat = true;
         let currentThemeIndex = 0;
-        let isViewBoxSet = false; // viewBoxを固定したかどうかのフラグ
+        let isViewBoxSet = false;
+        let clockTimer = null;
         
-        // テーマの配列 (背景色, テキスト色, 日付色)
+        // カラーテーマの配列
         const themes = [
-            { bg: '#0f172a', text: '#86efac', date: '#94a3b8' }, // Slate & Green (デフォルト)
-            { bg: '#000000', text: '#22c55e', date: '#166534' }, // Hacker Green
-            { bg: '#170f2a', text: '#e879f9', date: '#c026d3' }, // Neon Purple
-            { bg: '#2a0f0f', text: '#f87171', date: '#b91c1c' }, // Crimson
-            { bg: '#f8fafc', text: '#0f172a', date: '#475569' }  // Light Mode
+            { bg: '#000000', text: '#ffffff', date: '#ffffff', glow: false }, // 白黒（デフォルト）
+            { bg: '#0f172a', text: '#86efac', date: '#94a3b8', glow: true },  // Slate & Green
+            { bg: '#000000', text: '#22c55e', date: '#166534', glow: true },  // Hacker Green
+            { bg: '#170f2a', text: '#e879f9', date: '#c026d3', glow: true },  // Neon Purple
+            { bg: '#2a0f0f', text: '#f87171', date: '#b91c1c', glow: true },  // Crimson
+            { bg: '#f8fafc', text: '#0f172a', date: '#475569', glow: false }  // Light Mode
         ];
 
         // 時間と日付を更新する関数
         function updateClock() {
+            // タイマーの重複を防止
+            clearTimeout(clockTimer);
+
             const now = new Date();
             
             // 時間のフォーマット
@@ -90,71 +96,82 @@
             const seconds = String(now.getSeconds()).padStart(2, '0');
             
             if (!is24HourFormat) {
-                const ampm = hours >= 12 ? 'PM' : 'AM';
                 hours = hours % 12;
-                hours = hours ? hours : 12; // 0時は12時とする
-                // AM/PMを表示したい場合はここに追加できますが、シンプルさ重視で今回は数字のみ
+                hours = hours ? hours : 12;
             }
             
             const displayHours = String(hours).padStart(2, '0');
             const timeString = `${displayHours}:${minutes}:${seconds}`;
+
             const svgText = document.getElementById('time-svg');
             const svgEl = document.getElementById('svg-container');
 
             svgText.textContent = timeString;
 
-            // 初回、文字のバウンディングボックスを取得してSVGの描画領域をピッタリ合わせる
+            // 初回、文字のバウンディングボックスを取得
             if (!isViewBoxSet) {
-                // 最も幅が広そうな文字でサイズを測る
                 svgText.textContent = "00:00:00";
                 const bbox = svgText.getBBox();
+
                 if (bbox.width > 0) {
-                    // フォント自体の見えない上下余白を強引に削り込み、文字をさらに上下に引き伸ばす
-                    const tightenY = bbox.height * 0.1; // 10%削る
-                    svgEl.setAttribute('viewBox', `${bbox.x} ${bbox.y + tightenY} ${bbox.width} ${bbox.height - tightenY * 2}`);
+                    const tightenY = bbox.height * 0.1;
+
+                    svgEl.setAttribute(
+                        'viewBox',
+                        `${bbox.x} ${bbox.y + tightenY} ${bbox.width} ${bbox.height - tightenY * 2}`
+                    );
+
                     isViewBoxSet = true;
                 }
-                svgText.textContent = timeString; // 元に戻す
+
+                svgText.textContent = timeString;
             }
 
-            // 日付のフォーマット (例: 2026/05/08 (金))
+            // 日付のフォーマット
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const date = String(now.getDate()).padStart(2, '0');
             const days = ['日', '月', '火', '水', '木', '金', '土'];
             const dayOfWeek = days[now.getDay()];
             
-            document.getElementById('date').textContent = `${year}/${month}/${date} (${dayOfWeek})`;
+            document.getElementById('date').textContent =
+                `${year}/${month}/${date} (${dayOfWeek})`;
 
-            // 次の秒が切り替わるジャストのタイミングで再帰呼び出し（高精度）
+            // 次の秒が切り替わるタイミングで更新
             const msToNextSecond = 1000 - now.getMilliseconds();
-            setTimeout(updateClock, msToNextSecond);
+            clockTimer = setTimeout(updateClock, msToNextSecond);
         }
 
         // 12/24時間表記の切り替え
         function toggleFormat() {
             is24HourFormat = !is24HourFormat;
-            // 即座に更新を反映させるために少しだけ待つ(setTimeoutがクリアされないように配慮)
-            const now = new Date();
             updateClock();
+        }
+
+        // テーマを適用する関数
+        function applyTheme() {
+            const theme = themes[currentThemeIndex];
+            const svgContainer = document.getElementById('svg-container');
+
+            document.body.style.backgroundColor = theme.bg;
+            svgContainer.style.color = theme.text;
+            document.getElementById('date').style.color = theme.date;
+
+            // テーマごとに発光効果を設定
+            if (theme.glow) {
+                svgContainer.style.filter =
+                    `drop-shadow(0 0 40px ${theme.text}40)`;
+            } else {
+                svgContainer.style.filter = 'none';
+            }
         }
 
         // テーマの変更
         function changeTheme() {
-            currentThemeIndex = (currentThemeIndex + 1) % themes.length;
-            const theme = themes[currentThemeIndex];
-            
-            document.body.style.backgroundColor = theme.bg;
-            document.getElementById('svg-container').style.color = theme.text;
-            document.getElementById('date').style.color = theme.date;
-            
-            // ライトモードの時はドロップシャドウを消すなどの微調整
-            const svgContainer = document.getElementById('svg-container');
-            if(theme.bg === '#f8fafc') {
-                svgContainer.style.filter = 'none';
-            } else {
-                svgContainer.style.filter = `drop-shadow(0 0 40px ${theme.text}40)`; // 40は透明度25%の16進数
-            }
+            currentThemeIndex =
+                (currentThemeIndex + 1) % themes.length;
+
+            applyTheme();
         }
 
         // フルスクリーンの切り替え
@@ -162,23 +179,42 @@
             const doc = window.document;
             const docEl = doc.documentElement;
 
-            const requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
-            const cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+            const requestFullScreen =
+                docEl.requestFullscreen ||
+                docEl.mozRequestFullScreen ||
+                docEl.webkitRequestFullScreen ||
+                docEl.msRequestFullscreen;
+
+            const cancelFullScreen =
+                doc.exitFullscreen ||
+                doc.mozCancelFullScreen ||
+                doc.webkitExitFullscreen ||
+                doc.msExitFullscreen;
 
             const icon = document.getElementById('fs-icon');
 
-            if (!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
+            if (
+                !doc.fullscreenElement &&
+                !doc.mozFullScreenElement &&
+                !doc.webkitFullscreenElement &&
+                !doc.msFullscreenElement
+            ) {
                 requestFullScreen.call(docEl);
+
                 // 縮小アイコンに変更
                 icon.innerHTML = '<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>';
             } else {
                 cancelFullScreen.call(doc);
+
                 // 拡大アイコンに戻す
                 icon.innerHTML = '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>';
             }
         }
 
-        // 初回実行
+        // 初期テーマを適用
+        applyTheme();
+
+        // 時計を起動
         updateClock();
     </script>
 </body>
